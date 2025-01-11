@@ -30,11 +30,18 @@ export async function addOrUpdateTask(
   params: {
     key: string;
     value?: string;
+    reQueue?: boolean;
   }
 ): Promise<number> {
   const task = await findTaskByKey(db, params);
   if (task) {
     await updateTask(db, task.id, params);
+    if (params.reQueue) {
+      await updateTask(db, task.id, {
+        status: 'pending',
+        queue_order: new Date(),
+      });
+    }
     return task.id;
   }
   return addTask(db, params);
@@ -55,6 +62,7 @@ export async function processTask(
   await updateTask(db, task.id, {
     status: 'processing',
     started_at: new Date(),
+    queue_order: new Date(),
   });
   await process(task);
   if (removeAfterProcessing) {
@@ -63,12 +71,13 @@ export async function processTask(
     await updateTask(db, task.id, {
       status: 'completed',
       completed_at: new Date(),
+      queue_order: new Date(),
     });
   }
   return true;
 }
 
-export async function dequeueTask(
+async function dequeueTask(
   db: Database,
   params: {
     statuses: Task['status'][];
@@ -95,7 +104,7 @@ export async function dequeueTask(
   });
 }
 
-export async function findTaskByKey(
+async function findTaskByKey(
   db: Database,
   params: {
     key: string;
@@ -113,7 +122,7 @@ export async function findTaskByKey(
   });
 }
 
-export async function updateTask(
+async function updateTask(
   db: Database,
   id: number,
   params: Partial<
@@ -193,7 +202,7 @@ export async function updateTask(
   });
 }
 
-export async function deleteTask(db: Database, id: number) {
+async function deleteTask(db: Database, id: number) {
   return new Promise((resolve, reject) =>
     db.run(`DELETE FROM tasks WHERE id = ?`, [id], (err) => {
       if (err) reject(err);

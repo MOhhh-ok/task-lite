@@ -8,7 +8,7 @@ async function main() {
       key: `abc-${i}`,
       value: `def-${i}`,
     });
-    console.log({ n });
+    // console.log({ n });
   }
   for (let i = 0; i < 3; i++) {
     const task = await taskLite.processTask({

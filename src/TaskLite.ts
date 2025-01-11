@@ -1,14 +1,6 @@
 import sqlite3 from 'sqlite3';
 import { initDb } from './db';
-import {
-  addTask,
-  processTask,
-  addOrUpdateTask,
-  deleteTask,
-  dequeueTask,
-  findTaskByKey,
-  updateTask,
-} from './taskHelper';
+import { addOrUpdateTask, addTask, processTask } from './taskHelper';
 
 export class TaskLite {
   private db: sqlite3.Database;
@@ -28,18 +20,4 @@ export class TaskLite {
   async processTask(params: Parameters<typeof processTask>[1]) {
     return await processTask(this.db, params);
   }
-  // async deleteTask(params: Parameters<typeof deleteTask>[1]) {
-  //   return await deleteTask(this.db, params);
-  // }
-  // async dequeueTask(params: Parameters<typeof dequeueTask>[1]) {
-  //   return await dequeueTask(this.db, params);
-  // }
-  // async findTaskByCategoryAndKey(
-  //   params: Parameters<typeof findTaskByCategoryAndKey>[1]
-  // ) {
-  //   return await findTaskByCategoryAndKey(this.db, params);
-  // }
-  // async updateTask(id: number, params: Parameters<typeof updateTask>[2]) {
-  //   return await updateTask(this.db, id, params);
-  // }
 }
