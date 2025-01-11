@@ -13,7 +13,7 @@ A lightweight, SQLite-based task queue system for Node.js applications.
 ## Installation
 
 ```bash
-npm install @masa-dev/tesk-lite
+npm install @masa-dev/tesk-lite better-sqlite3
 ```
 
 ## Usage
@@ -24,16 +24,16 @@ npm install @masa-dev/tesk-lite
 import { TaskLite } from '@masa-dev/task-lite';
 
 // Initialize TaskLite with sqlite database path. Also :memory: is available
-const taskQueue = await TaskLite.create({ path: './tasks.db' });
+const taskLite = await TaskLite.create({ path: './tasks.db' });
 
 // Enqueue a task
-await taskQueue.enqueue({
+await taskLite.enqueue({
   key: 'user@example.com',
   value: JSON.stringify({ subject: 'Hello' }), // Optional.
 });
 
 // Process tasks
-await taskQueue.process(async (task) => {
+await taskLite.process(async (task) => {
   const data = JSON.parse(task.value);
   await sendEmail(task.key, data);
 }, {
