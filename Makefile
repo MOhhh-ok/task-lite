@@ -3,4 +3,4 @@
 build:
 	pnpm run build
 test:
-	pnpm run build && pnpm tsx test/index.ts
+	pnpm run test

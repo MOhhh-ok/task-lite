@@ -1,21 +1,32 @@
 {
-  "name": "@masa-dev/task-queue",
+  "name": "@masa-dev/task-lite",
   "version": "0.0.1",
-  "description": "Task queue",
+  "description": "Task lite",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
+    "test": "vitest",
     "prepublishOnly": "pnpm build"
   },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "kysely": "^0.27.5",
-    "sqlite3": "^5.1.7"
+    "remeda": "^2.19.0"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^11.7.2"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
+    "@types/better-sqlite3": "^7.6.12",
     "@types/jest": "^29.5.14",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.2.5",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
   }
 }
