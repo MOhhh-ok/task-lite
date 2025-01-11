@@ -1,8 +1,7 @@
 export interface Task {
   id: number;
-  category: string;
   key: string;
-  data: string;
+  value?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   started_at: Date | null;
   completed_at: Date | null;

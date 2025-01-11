@@ -5,16 +5,15 @@ import { Task } from './types';
 export async function addTask(
   db: Database,
   params: {
-    category: string;
     key: string;
-    data?: any;
+    value?: string;
   }
 ): Promise<number> {
-  const { category, key, data } = params;
+  const { key, value } = params;
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT INTO tasks (category, key, data) VALUES (?, ?, ?)`,
-      [category, key, JSON.stringify(data ?? {})],
+      `INSERT INTO tasks (key, value) VALUES (?, ?)`,
+      [key, value],
       function (err) {
         if (err) {
           reject(err);
@@ -29,12 +28,11 @@ export async function addTask(
 export async function addOrUpdateTask(
   db: Database,
   params: {
-    category: string;
     key: string;
-    data?: any;
+    value?: string;
   }
 ): Promise<number> {
-  const task = await findTaskByCategoryAndKey(db, params);
+  const task = await findTaskByKey(db, params);
   if (task) {
     await updateTask(db, task.id, params);
     return task.id;
@@ -46,15 +44,13 @@ export async function addOrUpdateTask(
 export async function processTask(
   db: Database,
   params: {
-    category: string;
-    key: string;
-    statuses: Task['status'][];
+    statuses?: Task['status'][];
     process: (task: Task) => Promise<void>;
     removeAfterProcessing?: boolean;
   }
 ): Promise<boolean> {
-  const { category, statuses, process, removeAfterProcessing } = params;
-  const task = await dequeueTask(db, { category, statuses });
+  const { statuses = ['pending'], process, removeAfterProcessing } = params;
+  const task = await dequeueTask(db, { statuses });
   if (!task) return false;
   await updateTask(db, task.id, {
     status: 'processing',
@@ -75,11 +71,10 @@ export async function processTask(
 export async function dequeueTask(
   db: Database,
   params: {
-    category: string;
     statuses: Task['status'][];
   }
 ): Promise<Task | undefined> {
-  const { category, statuses } = params;
+  const { statuses } = params;
   const statusCondition = `status IN (${statuses
     .map((status) => `'${status}'`)
     .join(',')})`;
@@ -87,10 +82,9 @@ export async function dequeueTask(
     db.get(
       `
         SELECT * FROM tasks
-        WHERE category = ? AND ${statusCondition}
+        WHERE ${statusCondition}
         ORDER BY queue_order LIMIT 1
       `,
-      [category],
       (err, task: Task | undefined) => {
         if (err) {
           reject(err);
@@ -101,17 +95,16 @@ export async function dequeueTask(
   });
 }
 
-export async function findTaskByCategoryAndKey(
+export async function findTaskByKey(
   db: Database,
   params: {
-    category: string;
     key: string;
   }
 ): Promise<Task | undefined> {
   return new Promise((resolve, reject) => {
     db.get(
-      'SELECT * FROM tasks WHERE category = ? AND key = ?',
-      [params.category, params.key],
+      'SELECT * FROM tasks WHERE key = ?',
+      [params.key],
       (err, task: Task | undefined) => {
         if (err) reject(err);
         resolve(task);
@@ -126,81 +119,72 @@ export async function updateTask(
   params: Partial<
     Pick<
       Task,
-      | 'category'
-      | 'key'
-      | 'data'
-      | 'status'
-      | 'queue_order'
-      | 'started_at'
-      | 'completed_at'
+      'key' | 'value' | 'status' | 'queue_order' | 'started_at' | 'completed_at'
     >
   >
 ) {
   return new Promise((resolve, reject) => {
-    db.run('BEGIN TRANSACTION');
-
     const updatePrefix = 'UPDATE tasks SET ';
     const updateSuffix = ' WHERE id = ?';
 
     try {
-      // カテゴリの更新
-      if (params.category) {
-        db.run(updatePrefix + 'category = ?' + updateSuffix, [
-          params.category,
-          id,
-        ]);
-      }
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
 
-      // キーの更新
-      if (params.key) {
-        db.run(updatePrefix + 'key = ?' + updateSuffix, [params.key, id]);
-      }
-
-      // データの更新
-      if (params.data) {
-        db.run(updatePrefix + 'data = ?' + updateSuffix, [params.data, id]);
-      }
-
-      // ステータスの更新
-      if (params.status) {
-        db.run(updatePrefix + 'status = ?' + updateSuffix, [params.status, id]);
-      }
-
-      // キュー順序の更新
-      if (params.queue_order) {
-        db.run(updatePrefix + 'queue_order = ?' + updateSuffix, [
-          params.queue_order,
-          id,
-        ]);
-      }
-
-      // 開始日時の更新
-      if (params.started_at) {
-        db.run(updatePrefix + 'started_at = ?' + updateSuffix, [
-          params.started_at,
-          id,
-        ]);
-      }
-
-      // 完了日時の更新
-      if (params.completed_at) {
-        db.run(updatePrefix + 'completed_at = ?' + updateSuffix, [
-          params.completed_at,
-          id,
-        ]);
-      }
-
-      // 更新日時は常に現在時刻に設定
-      db.run(updatePrefix + 'updated_at = CURRENT_TIMESTAMP' + updateSuffix, [
-        id,
-      ]);
-
-      db.run('COMMIT', (err) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(true);
+        // キーの更新
+        if (params.key) {
+          db.run(updatePrefix + 'key = ?' + updateSuffix, [params.key, id]);
         }
+
+        // データの更新
+        if (params.value) {
+          db.run(updatePrefix + 'value = ?' + updateSuffix, [params.value, id]);
+        }
+
+        // ステータスの更新
+        if (params.status) {
+          db.run(updatePrefix + 'status = ?' + updateSuffix, [
+            params.status,
+            id,
+          ]);
+        }
+
+        // キュー順序の更新
+        if (params.queue_order) {
+          db.run(updatePrefix + 'queue_order = ?' + updateSuffix, [
+            params.queue_order,
+            id,
+          ]);
+        }
+
+        // 開始日時の更新
+        if (params.started_at) {
+          db.run(updatePrefix + 'started_at = ?' + updateSuffix, [
+            params.started_at,
+            id,
+          ]);
+        }
+
+        // 完了日時の更新
+        if (params.completed_at) {
+          db.run(updatePrefix + 'completed_at = ?' + updateSuffix, [
+            params.completed_at,
+            id,
+          ]);
+        }
+
+        // 更新日時は常に現在時刻に設定
+        db.run(updatePrefix + 'updated_at = CURRENT_TIMESTAMP' + updateSuffix, [
+          id,
+        ]);
+
+        db.run('COMMIT', (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(true);
+          }
+        });
       });
     } catch (err) {
       db.run('ROLLBACK');

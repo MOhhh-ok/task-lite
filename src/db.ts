@@ -12,9 +12,8 @@ export async function initDb(params: {
         `
         CREATE TABLE IF NOT EXISTS tasks (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          category TEXT NOT NULL,
           key TEXT NOT NULL,
-          data TEXT DEFAULT '{}',
+          value TEXT,
           status TEXT DEFAULT 'pending',
           started_at DATETIME,
           completed_at DATETIME,
@@ -23,9 +22,7 @@ export async function initDb(params: {
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`
       )
-        .run(
-          'CREATE UNIQUE INDEX IF NOT EXISTS idx_category_key ON tasks(category, key)'
-        )
+        .run('CREATE UNIQUE INDEX IF NOT EXISTS idx_key ON tasks(key)')
         .run('CREATE INDEX IF NOT EXISTS idx_status ON tasks(status)')
         .run(
           'CREATE INDEX IF NOT EXISTS idx_queue_order ON tasks(queue_order)',

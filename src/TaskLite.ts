@@ -6,7 +6,7 @@ import {
   addOrUpdateTask,
   deleteTask,
   dequeueTask,
-  findTaskByCategoryAndKey,
+  findTaskByKey,
   updateTask,
 } from './taskHelper';
 
@@ -20,26 +20,26 @@ export class TaskLite {
     return new TaskLite(db);
   }
   async addTask(params: Parameters<typeof addTask>[1]) {
-    await addTask(this.db, params);
-  }
-  async processTask(params: Parameters<typeof processTask>[1]) {
-    await processTask(this.db, params);
+    return await addTask(this.db, params);
   }
   async addOrUpdateTask(params: Parameters<typeof addOrUpdateTask>[1]) {
-    await addOrUpdateTask(this.db, params);
+    return await addOrUpdateTask(this.db, params);
   }
-  async deleteTask(params: Parameters<typeof deleteTask>[1]) {
-    await deleteTask(this.db, params);
+  async processTask(params: Parameters<typeof processTask>[1]) {
+    return await processTask(this.db, params);
   }
-  async dequeueTask(params: Parameters<typeof dequeueTask>[1]) {
-    await dequeueTask(this.db, params);
-  }
-  async findTaskByCategoryAndKey(
-    params: Parameters<typeof findTaskByCategoryAndKey>[1]
-  ) {
-    await findTaskByCategoryAndKey(this.db, params);
-  }
-  async updateTask(id: number, params: Parameters<typeof updateTask>[2]) {
-    await updateTask(this.db, id, params);
-  }
+  // async deleteTask(params: Parameters<typeof deleteTask>[1]) {
+  //   return await deleteTask(this.db, params);
+  // }
+  // async dequeueTask(params: Parameters<typeof dequeueTask>[1]) {
+  //   return await dequeueTask(this.db, params);
+  // }
+  // async findTaskByCategoryAndKey(
+  //   params: Parameters<typeof findTaskByCategoryAndKey>[1]
+  // ) {
+  //   return await findTaskByCategoryAndKey(this.db, params);
+  // }
+  // async updateTask(id: number, params: Parameters<typeof updateTask>[2]) {
+  //   return await updateTask(this.db, id, params);
+  // }
 }
