@@ -1,0 +1,17 @@
+{
+  "name": "@masa-dev/task-queue",
+  "version": "0.0.1",
+  "description": "Task queue",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@tsconfig/node20": "^20.1.4",
+    "tsx": "^4.19.2"
+  }
+}
