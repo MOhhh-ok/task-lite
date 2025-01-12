@@ -12,7 +12,7 @@ describe('TaskLite', () => {
   describe('enqueue', () => {
     it('タスクを追加できること', async () => {
       const task = { key: 'test-key', value: 'test-value' };
-      await taskLite.enqueue(task);
+      await taskLite.enqueueOrThrow(task);
 
       const db = taskLite.getDb();
       const result = await db
@@ -30,11 +30,11 @@ describe('TaskLite', () => {
 
     it('upsertオプションで既存のタスクを更新できること', async () => {
       const task = { key: 'test-key', value: 'test-value' };
-      await taskLite.enqueue(task);
-      await taskLite.enqueue(
-        { key: task.key, value: 'updated-value' },
-        { upsert: true }
-      );
+      await taskLite.enqueueOrThrow(task);
+      await taskLite.enqueueOrUpdate({
+        key: task.key,
+        value: 'updated-value',
+      });
 
       const db = taskLite.getDb();
       const results = await db
@@ -55,7 +55,7 @@ describe('TaskLite', () => {
   describe('process', () => {
     it('タスクを処理できること', async () => {
       const task = { key: 'test-key', value: 'test-value' };
-      await taskLite.enqueue(task);
+      await taskLite.enqueueOrThrow(task);
 
       const callback = vi.fn();
       const processed = await taskLite.process(callback, {});
@@ -75,7 +75,7 @@ describe('TaskLite', () => {
 
     it('keepAfterProcessオプションでタスクを保持できること', async () => {
       const task = { key: 'test-key', value: 'test-value' };
-      await taskLite.enqueue(task);
+      await taskLite.enqueueOrThrow(task);
 
       const callback = vi.fn();
       await taskLite.process(callback, { keepAfterProcess: true });
@@ -100,8 +100,8 @@ describe('TaskLite', () => {
       const task1 = { key: 'test-1', value: 'value-1' };
       const task2 = { key: 'test-2', value: 'value-2' };
 
-      await taskLite.enqueue(task1);
-      await taskLite.enqueue(task2);
+      await taskLite.enqueueOrThrow(task1);
+      await taskLite.enqueueOrThrow(task2);
       await taskLite.process(vi.fn(), { keepAfterProcess: true });
 
       await taskLite.remove({ and: { statuses: ['completed'] } });
@@ -124,8 +124,8 @@ describe('remove', () => {
 
   it('指定したIDのタスクを削除する', async () => {
     // タスクを作成
-    await tasklite.enqueue({ key: 'test1', value: 'value1' });
-    await tasklite.enqueue({ key: 'test2', value: 'value2' });
+    await tasklite.enqueueOrThrow({ key: 'test1', value: 'value1' });
+    await tasklite.enqueueOrThrow({ key: 'test2', value: 'value2' });
     const task = await tasklite
       .getDb()
       .selectFrom('tasks')
@@ -146,8 +146,8 @@ describe('remove', () => {
 
   it('指定したステータスのタスクを削除する', async () => {
     // 異なるステータスのタスクを作成
-    await tasklite.enqueue({ key: 'test1', value: 'value1' });
-    await tasklite.enqueue({ key: 'test2', value: 'value2' });
+    await tasklite.enqueueOrThrow({ key: 'test1', value: 'value1' });
+    await tasklite.enqueueOrThrow({ key: 'test2', value: 'value2' });
     await tasklite
       .getDb()
       .updateTable('tasks')
@@ -173,7 +173,7 @@ describe('remove', () => {
     const oldDate = new Date('2024-01-01');
     const newDate = new Date('2024-01-02');
 
-    await tasklite.enqueue({ key: 'test1', value: 'value1' });
+    await tasklite.enqueueOrThrow({ key: 'test1', value: 'value1' });
     await tasklite
       .getDb()
       .updateTable('tasks')
@@ -181,7 +181,7 @@ describe('remove', () => {
       .set({ queued_at: oldDate.toISOString() })
       .execute();
 
-    await tasklite.enqueue({ key: 'test2', value: 'value2' });
+    await tasklite.enqueueOrThrow({ key: 'test2', value: 'value2' });
     await tasklite
       .getDb()
       .updateTable('tasks')

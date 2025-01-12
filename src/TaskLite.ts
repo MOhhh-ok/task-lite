@@ -4,6 +4,7 @@ import { initDb } from './database';
 import { Database, NewTask, Task, TaskStatus, TaskUpdate } from './types';
 
 type LogLevel = 'sql';
+type EnqueueData = Pick<NewTask, 'key' | 'value'>;
 
 export class TaskLite {
   private constructor(
@@ -20,53 +21,49 @@ export class TaskLite {
     return this.db;
   }
 
-  async enqueue(
-    data: Pick<NewTask, 'key' | 'value'>,
-    ops?: { upsert?: boolean }
-  ): Promise<InsertResult[]> {
-    const newData = R.pick(data, ['key', 'value']);
-    const updateData: TaskUpdate = {
-      ...newData,
-      status: 'pending',
-      queued_at: new Date().toISOString(),
-    };
-    if (ops?.upsert) {
-      const query = this.db
-        .insertInto('tasks')
-        .values(newData)
-        .onConflict((oc) => oc.column('key').doUpdateSet(updateData));
-      this.logSql(query);
-      return query.execute();
-    } else {
-      const query = this.db.insertInto('tasks').values(newData);
-      this.logSql(query);
-      return query.execute();
-    }
+  async enqueue(data: EnqueueData) {
+    try {
+      return await this.enqueueOrThrow(data);
+    } catch (err: any) {}
+  }
+
+  async enqueueOrThrow(data: EnqueueData) {
+    return await this._enqueue(data, { upsert: false });
+  }
+
+  async enqueueOrUpdate(data: EnqueueData) {
+    return await this._enqueue(data, { upsert: true });
   }
 
   async process(
-    callback: (task: Task) => Promise<void>,
-    ops: {
-      statuses?: TaskStatus[];
+    callback: (tasks: Task[]) => Promise<void>,
+    ops?: {
+      statuses?: TaskStatus[] | 'all';
       keepAfterProcess?: boolean;
+      limit?: number;
     }
   ): Promise<boolean> {
-    const { statuses = ['pending'], keepAfterProcess } = ops;
-    const task = await this.getNextQueueTask({ statuses });
-    if (!task) return false;
-    await this.setAsProcessing(task.id);
+    const { statuses = ['pending'], keepAfterProcess, limit = 1 } = ops ?? {};
+    const statuses2: TaskStatus[] =
+      statuses === 'all'
+        ? ['pending', 'processing', 'completed', 'failed']
+        : statuses;
+    const tasks = await this.getNextQueueTasks({ statuses: statuses2, limit });
+    if (!tasks) return false;
+    const ids = tasks.map((t) => t.id);
+    await this.setAsProcessing(ids);
     try {
-      await callback(task);
+      await callback(tasks);
     } catch (err: any) {
-      await this.setAsFailed(task.id);
+      await this.setAsFailed(ids);
       throw err;
     }
     if (!keepAfterProcess) {
-      const query = this.db.deleteFrom('tasks').where('id', '=', task.id);
+      const query = this.db.deleteFrom('tasks').where('id', 'in', ids);
       this.logSql(query);
       await query.execute();
     } else {
-      await this.setAsCompleted(task.id);
+      await this.setAsCompleted(ids);
     }
     return true;
   }
@@ -88,18 +85,47 @@ export class TaskLite {
     await query.execute();
   }
 
-  private async getNextQueueTask(params: { statuses: TaskStatus[] }) {
+  private async _enqueue(
+    data: EnqueueData,
+    ops?: { upsert: boolean }
+  ): Promise<InsertResult[]> {
+    const newData = R.pick(data, ['key', 'value']);
+    const updateData: TaskUpdate = {
+      ...newData,
+      status: 'pending',
+      queued_at: new Date().toISOString(),
+    };
+    console.log({ newData, updateData });
+    if (ops?.upsert) {
+      const query = this.db
+        .insertInto('tasks')
+        .values(newData)
+        .onConflict((oc) => oc.column('key').doUpdateSet(updateData));
+      this.logSql(query);
+      return query.execute();
+    } else {
+      const query = this.db.insertInto('tasks').values(newData);
+      this.logSql(query);
+      return query.execute();
+    }
+  }
+
+  private async getNextQueueTasks(params: {
+    statuses: TaskStatus[];
+    limit: number;
+  }) {
     const query = this.db
       .selectFrom('tasks')
       .selectAll()
       .orderBy('queued_at')
-      .where('status', 'in', params.statuses);
+      .where('status', 'in', params.statuses)
+      .limit(params.limit);
     this.logSql(query);
-    return await query.executeTakeFirst();
+    return await query.execute();
   }
 
-  private async setAsProcessing(id: number) {
-    const query = this.db.updateTable('tasks').where('id', '=', id).set({
+  private async setAsProcessing(ids: number[]) {
+    const query = this.db.updateTable('tasks').where('id', 'in', ids).set({
       status: 'processing',
       processed_at: new Date().toISOString(),
       queued_at: new Date().toISOString(),
@@ -108,8 +134,8 @@ export class TaskLite {
     await query.execute();
   }
 
-  private async setAsCompleted(id: number) {
-    const query = this.db.updateTable('tasks').where('id', '=', id).set({
+  private async setAsCompleted(ids: number[]) {
+    const query = this.db.updateTable('tasks').where('id', 'in', ids).set({
       status: 'completed',
       completed_at: new Date().toISOString(),
       queued_at: new Date().toISOString(),
@@ -118,8 +144,8 @@ export class TaskLite {
     await query.execute();
   }
 
-  private async setAsFailed(id: number) {
-    const query = this.db.updateTable('tasks').where('id', '=', id).set({
+  private async setAsFailed(ids: number[]) {
+    const query = this.db.updateTable('tasks').where('id', 'in', ids).set({
       status: 'failed',
       failed_at: new Date().toISOString(),
       queued_at: new Date().toISOString(),
