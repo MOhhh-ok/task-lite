@@ -1,24 +1,19 @@
-import { Kysely } from 'kysely';
+import { InsertResult, Kysely } from 'kysely';
 import * as R from 'remeda';
 import { initDb } from './database';
-import {
-  Database,
-  NewTask,
-  Task,
-  TaskStatus,
-  TaskTable,
-  TaskUpdate,
-} from './types';
+import { Database, NewTask, Task, TaskStatus, TaskUpdate } from './types';
+
+type LogLevel = 'sql';
 
 export class TaskLite {
-  private db: Kysely<Database>;
-  private constructor(db: Kysely<Database>) {
-    this.db = db;
-  }
+  private constructor(
+    private db: Kysely<Database>,
+    private logLevels: LogLevel[] = []
+  ) {}
 
-  static async create(params: { path: string }) {
+  static async create(params: { path: string; logLevels?: LogLevel[] }) {
     const db = await initDb(params);
-    return new TaskLite(db);
+    return new TaskLite(db, params.logLevels);
   }
 
   getDb() {
@@ -28,7 +23,7 @@ export class TaskLite {
   async enqueue(
     data: Pick<NewTask, 'key' | 'value'>,
     ops?: { upsert?: boolean }
-  ) {
+  ): Promise<InsertResult[]> {
     const newData = R.pick(data, ['key', 'value']);
     const updateData: TaskUpdate = {
       ...newData,
@@ -36,13 +31,16 @@ export class TaskLite {
       queued_at: new Date().toISOString(),
     };
     if (ops?.upsert) {
-      return this.db
+      const query = this.db
         .insertInto('tasks')
         .values(newData)
-        .onConflict((oc) => oc.column('key').doUpdateSet(updateData))
-        .execute();
+        .onConflict((oc) => oc.column('key').doUpdateSet(updateData));
+      this.logSql(query);
+      return query.execute();
     } else {
-      return this.db.insertInto('tasks').values(newData).execute();
+      const query = this.db.insertInto('tasks').values(newData);
+      this.logSql(query);
+      return query.execute();
     }
   }
 
@@ -64,62 +62,91 @@ export class TaskLite {
       throw err;
     }
     if (!keepAfterProcess) {
-      await this.db.deleteFrom('tasks').where('id', '=', task.id).execute();
+      const query = this.db.deleteFrom('tasks').where('id', '=', task.id);
+      this.logSql(query);
+      await query.execute();
     } else {
       await this.setAsCompleted(task.id);
     }
     return true;
   }
 
+  async remove(params: {
+    and: {
+      id?: number;
+      statuses?: TaskStatus[];
+      queuedBefore?: Date;
+    };
+  }) {
+    const { id, statuses, queuedBefore } = params.and;
+    let query = this.db.deleteFrom('tasks');
+    if (id) query = query.where('id', '=', id);
+    if (statuses) query = query.where('status', 'in', statuses);
+    if (queuedBefore)
+      query = query.where('queued_at', '<', queuedBefore.toISOString());
+    this.logSql(query);
+    await query.execute();
+  }
+
   async removeByStatus(params: { statuses: TaskStatus[] }) {
-    await this.db
+    const query = this.db
       .deleteFrom('tasks')
-      .where('status', 'in', params.statuses)
-      .execute();
+      .where('status', 'in', params.statuses);
+    this.logSql(query);
+    await query.execute();
+  }
+
+  async removeByQueuedAt(params: { queuedAt: Date }) {
+    const query = this.db
+      .deleteFrom('tasks')
+      .where('queued_at', '<=', params.queuedAt.toISOString());
+    this.logSql(query);
+    await query.execute();
   }
 
   private async getNextQueueTask(params: { statuses: TaskStatus[] }) {
-    return await this.db
+    const query = this.db
       .selectFrom('tasks')
       .selectAll()
       .orderBy('queued_at')
-      .where('status', 'in', params.statuses)
-      .executeTakeFirst();
+      .where('status', 'in', params.statuses);
+    this.logSql(query);
+    return await query.executeTakeFirst();
   }
 
   private async setAsProcessing(id: number) {
-    await this.db
-      .updateTable('tasks')
-      .where('id', '=', id)
-      .set({
-        status: 'processing',
-        processed_at: new Date().toISOString(),
-        queued_at: new Date().toISOString(),
-      })
-      .execute();
+    const query = this.db.updateTable('tasks').where('id', '=', id).set({
+      status: 'processing',
+      processed_at: new Date().toISOString(),
+      queued_at: new Date().toISOString(),
+    });
+    this.logSql(query);
+    await query.execute();
   }
 
   private async setAsCompleted(id: number) {
-    await this.db
-      .updateTable('tasks')
-      .where('id', '=', id)
-      .set({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        queued_at: new Date().toISOString(),
-      })
-      .execute();
+    const query = this.db.updateTable('tasks').where('id', '=', id).set({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      queued_at: new Date().toISOString(),
+    });
+    this.logSql(query);
+    await query.execute();
   }
 
   private async setAsFailed(id: number) {
-    await this.db
-      .updateTable('tasks')
-      .where('id', '=', id)
-      .set({
-        status: 'failed',
-        failed_at: new Date().toISOString(),
-        queued_at: new Date().toISOString(),
-      })
-      .execute();
+    const query = this.db.updateTable('tasks').where('id', '=', id).set({
+      status: 'failed',
+      failed_at: new Date().toISOString(),
+      queued_at: new Date().toISOString(),
+    });
+    this.logSql(query);
+    await query.execute();
+  }
+
+  private logSql(query: any) {
+    if (!this.logLevels.includes('sql')) return;
+    console.log(query.compile().sql);
+    console.log(query.compile().parameters);
   }
 }

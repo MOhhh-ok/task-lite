@@ -114,3 +114,91 @@ describe('TaskLite', () => {
     });
   });
 });
+
+describe('remove', () => {
+  let tasklite: TaskLite;
+
+  beforeEach(async () => {
+    tasklite = await TaskLite.create({ path: ':memory:', logLevels: ['sql'] });
+  });
+
+  it('指定したIDのタスクを削除する', async () => {
+    // タスクを作成
+    await tasklite.enqueue({ key: 'test1', value: 'value1' });
+    await tasklite.enqueue({ key: 'test2', value: 'value2' });
+    const task = await tasklite
+      .getDb()
+      .selectFrom('tasks')
+      .selectAll()
+      .executeTakeFirst();
+
+    // タスクを削除
+    await tasklite.remove({ and: { id: task!.id } });
+
+    // タスクが削除されたことを確認
+    const result = await tasklite
+      .getDb()
+      .selectFrom('tasks')
+      .selectAll()
+      .execute();
+    expect(result).toHaveLength(1);
+  });
+
+  it('指定したステータスのタスクを削除する', async () => {
+    // 異なるステータスのタスクを作成
+    await tasklite.enqueue({ key: 'test1', value: 'value1' });
+    await tasklite.enqueue({ key: 'test2', value: 'value2' });
+    await tasklite
+      .getDb()
+      .updateTable('tasks')
+      .where('key', '=', 'test2')
+      .set({ status: 'completed' })
+      .execute();
+
+    // completedステータスのタスクを削除
+    await tasklite.remove({ and: { statuses: ['completed'] } });
+
+    // pendingのタスクのみが残っていることを確認
+    const results = await tasklite
+      .getDb()
+      .selectFrom('tasks')
+      .selectAll()
+      .execute();
+    expect(results).toHaveLength(1);
+    expect(results[0].status).toBe('pending');
+  });
+
+  it('指定した日時より前のタスクを削除する', async () => {
+    // 異なる時間のタスクを作成
+    const oldDate = new Date('2024-01-01');
+    const newDate = new Date('2024-01-02');
+
+    await tasklite.enqueue({ key: 'test1', value: 'value1' });
+    await tasklite
+      .getDb()
+      .updateTable('tasks')
+      .where('key', '=', 'test1')
+      .set({ queued_at: oldDate.toISOString() })
+      .execute();
+
+    await tasklite.enqueue({ key: 'test2', value: 'value2' });
+    await tasklite
+      .getDb()
+      .updateTable('tasks')
+      .where('key', '=', 'test2')
+      .set({ queued_at: newDate.toISOString() })
+      .execute();
+
+    // 古い日付のタスクを削除
+    await tasklite.remove({ and: { queuedBefore: newDate } });
+
+    // 新しい日付のタスクのみが残っていることを確認
+    const results = await tasklite
+      .getDb()
+      .selectFrom('tasks')
+      .selectAll()
+      .execute();
+    expect(results).toHaveLength(1);
+    expect(results[0].key).toBe('test2');
+  });
+});

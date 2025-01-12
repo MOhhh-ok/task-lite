@@ -16,7 +16,7 @@ export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export interface TaskTable {
   id: Generated<number>;
   key: string;
-  value?: JSONColumnType<any | null, any | null, any | null>;
+  value?: string;
   status: ColumnType<
     TaskStatus,
     TaskStatus | undefined,
