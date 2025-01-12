@@ -1,6 +1,6 @@
 import { Kysely, sql, SqliteDialect } from 'kysely';
 import SQLite from 'better-sqlite3';
-import { Database, Task } from './types';
+import { Database, Task, TaskStatus, TaskTable } from './types';
 import { sqlCurrentTimestamp } from './consts';
 
 export async function initDb(params: {
@@ -13,7 +13,7 @@ export async function initDb(params: {
     dialect,
   });
 
-  const defaultStatus: Task['status'] = 'pending';
+  const defaultStatus: TaskStatus = 'pending';
 
   await db.schema
     .createTable('tasks')
@@ -25,7 +25,7 @@ export async function initDb(params: {
     .addColumn('processed_at', 'datetime')
     .addColumn('completed_at', 'datetime')
     .addColumn('failed_at', 'datetime')
-    .addColumn('queue_order', 'datetime', (col) =>
+    .addColumn('queued_at', 'datetime', (col) =>
       col.defaultTo(sqlCurrentTimestamp)
     )
     .addColumn('created_at', 'datetime', (col) =>
@@ -49,9 +49,9 @@ export async function initDb(params: {
     .execute();
 
   await db.schema
-    .createIndex('idx_queue_order')
+    .createIndex('idx_queued_at')
     .on('tasks')
-    .columns(['queue_order'])
+    .columns(['queued_at'])
     .ifNotExists()
     .execute();
 

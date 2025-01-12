@@ -1,7 +1,14 @@
 import { Kysely } from 'kysely';
 import * as R from 'remeda';
 import { initDb } from './database';
-import { Database, Task } from './types';
+import {
+  Database,
+  NewTask,
+  Task,
+  TaskStatus,
+  TaskTable,
+  TaskUpdate,
+} from './types';
 
 export class TaskLite {
   private db: Kysely<Database>;
@@ -19,34 +26,35 @@ export class TaskLite {
   }
 
   async enqueue(
-    params: Pick<Task, 'key' | 'value'>,
+    data: Pick<NewTask, 'key' | 'value'>,
     ops?: { upsert?: boolean }
   ) {
-    const data: Pick<Task, 'key' | 'value' | 'status' | 'queue_order'> = {
-      ...R.pick(params, ['key', 'value']),
+    const newData = R.pick(data, ['key', 'value']);
+    const updateData: TaskUpdate = {
+      ...newData,
       status: 'pending',
-      queue_order: new Date().toISOString(),
+      queued_at: new Date().toISOString(),
     };
     if (ops?.upsert) {
       return this.db
         .insertInto('tasks')
-        .values(data)
-        .onConflict((oc) => oc.column('key').doUpdateSet(R.omit(data, ['key'])))
+        .values(newData)
+        .onConflict((oc) => oc.column('key').doUpdateSet(updateData))
         .execute();
     } else {
-      return this.db.insertInto('tasks').values(data).execute();
+      return this.db.insertInto('tasks').values(newData).execute();
     }
   }
 
   async process(
     callback: (task: Task) => Promise<void>,
     ops: {
-      statuses?: Task['status'][];
+      statuses?: TaskStatus[];
       keepAfterProcess?: boolean;
     }
   ): Promise<boolean> {
     const { statuses = ['pending'], keepAfterProcess } = ops;
-    const task = await this.getOldestTask({ statuses });
+    const task = await this.getNextQueueTask({ statuses });
     if (!task) return false;
     await this.setAsProcessing(task.id);
     try {
@@ -63,18 +71,18 @@ export class TaskLite {
     return true;
   }
 
-  async removeByStatus(params: { statuses: Task['status'][] }) {
+  async removeByStatus(params: { statuses: TaskStatus[] }) {
     await this.db
       .deleteFrom('tasks')
       .where('status', 'in', params.statuses)
       .execute();
   }
 
-  private async getOldestTask(params: { statuses: Task['status'][] }) {
+  private async getNextQueueTask(params: { statuses: TaskStatus[] }) {
     return await this.db
       .selectFrom('tasks')
       .selectAll()
-      .orderBy('queue_order')
+      .orderBy('queued_at')
       .where('status', 'in', params.statuses)
       .executeTakeFirst();
   }
@@ -86,7 +94,7 @@ export class TaskLite {
       .set({
         status: 'processing',
         processed_at: new Date().toISOString(),
-        queue_order: new Date().toISOString(),
+        queued_at: new Date().toISOString(),
       })
       .execute();
   }
@@ -98,7 +106,7 @@ export class TaskLite {
       .set({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        queue_order: new Date().toISOString(),
+        queued_at: new Date().toISOString(),
       })
       .execute();
   }
@@ -110,7 +118,7 @@ export class TaskLite {
       .set({
         status: 'failed',
         failed_at: new Date().toISOString(),
-        queue_order: new Date().toISOString(),
+        queued_at: new Date().toISOString(),
       })
       .execute();
   }

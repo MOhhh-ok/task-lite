@@ -55,7 +55,7 @@ export interface TaskTable {
   processed_at?: ColumnType<string, string | undefined, string | undefined>;
   completed_at?: ColumnType<string, string | undefined, string | undefined>;
   failed_at?: ColumnType<string, string | undefined, string | undefined>;
-  queue_order: ColumnType<string, string | undefined, string | undefined>;
+  queued_at: ColumnType<string, string | undefined, string | undefined>;
   created_at: ColumnType<string, never, never>;
 }
 ```
