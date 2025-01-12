@@ -1,6 +1,6 @@
 import { Kysely, sql, SqliteDialect } from 'kysely';
 import SQLite from 'better-sqlite3';
-import { Database, Task, TaskStatus, TaskTable } from './types';
+import { Database, Task, TaskStatus, TaskTable } from './types.database';
 import { sqlCurrentTimestamp } from './consts';
 
 export async function initDb(params: {

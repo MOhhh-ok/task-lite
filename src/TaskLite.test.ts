@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TaskLite } from './TaskLite';
-import { Database, Task } from './types';
+import { Database, Task } from './types.database';
 
 describe('TaskLite', () => {
   let taskLite: TaskLite;
@@ -58,7 +58,7 @@ describe('TaskLite', () => {
       await taskLite.enqueueOrThrow(task);
 
       const callback = vi.fn();
-      const processed = await taskLite.process(callback, {});
+      const processed = await taskLite.processMany(callback, {});
 
       expect(processed).toBe(true);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -78,7 +78,7 @@ describe('TaskLite', () => {
       await taskLite.enqueueOrThrow(task);
 
       const callback = vi.fn();
-      await taskLite.process(callback, { keepAfterProcess: true });
+      await taskLite.processMany(callback, { keepAfterProcess: true });
 
       const db = taskLite.getDb();
       const result = await db
@@ -102,7 +102,7 @@ describe('TaskLite', () => {
 
       await taskLite.enqueueOrThrow(task1);
       await taskLite.enqueueOrThrow(task2);
-      await taskLite.process(vi.fn(), { keepAfterProcess: true });
+      await taskLite.processMany(vi.fn(), { keepAfterProcess: true });
 
       await taskLite.remove({ and: { statuses: ['completed'] } });
 

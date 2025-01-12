@@ -1,10 +1,13 @@
 import { InsertResult, Kysely } from 'kysely';
 import * as R from 'remeda';
 import { initDb } from './database';
-import { Database, NewTask, Task, TaskStatus, TaskUpdate } from './types';
-
-type LogLevel = 'sql';
-type EnqueueData = Pick<NewTask, 'key' | 'value'>;
+import { Database, Task, TaskStatus, TaskUpdate } from './types.database';
+import {
+  EnqueueData,
+  ProcessManyOptions,
+  ProcessOptions,
+  LogLevel,
+} from './types.TaskLite';
 
 export class TaskLite {
   private constructor(
@@ -36,12 +39,18 @@ export class TaskLite {
   }
 
   async process(
+    callback: (task: Task) => Promise<void>,
+    ops?: ProcessOptions
+  ): Promise<boolean> {
+    return await this.processMany(async (tasks) => callback(tasks[0]), {
+      ...ops,
+      limit: 1,
+    });
+  }
+
+  async processMany(
     callback: (tasks: Task[]) => Promise<void>,
-    ops?: {
-      statuses?: TaskStatus[] | 'all';
-      keepAfterProcess?: boolean;
-      limit?: number;
-    }
+    ops?: ProcessManyOptions
   ): Promise<boolean> {
     const { statuses = ['pending'], keepAfterProcess, limit = 1 } = ops ?? {};
     const statuses2: TaskStatus[] =
