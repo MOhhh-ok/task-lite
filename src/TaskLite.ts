@@ -88,22 +88,6 @@ export class TaskLite {
     await query.execute();
   }
 
-  async removeByStatus(params: { statuses: TaskStatus[] }) {
-    const query = this.db
-      .deleteFrom('tasks')
-      .where('status', 'in', params.statuses);
-    this.logSql(query);
-    await query.execute();
-  }
-
-  async removeByQueuedAt(params: { queuedAt: Date }) {
-    const query = this.db
-      .deleteFrom('tasks')
-      .where('queued_at', '<=', params.queuedAt.toISOString());
-    this.logSql(query);
-    await query.execute();
-  }
-
   private async getNextQueueTask(params: { statuses: TaskStatus[] }) {
     const query = this.db
       .selectFrom('tasks')

@@ -104,7 +104,7 @@ describe('TaskLite', () => {
       await taskLite.enqueue(task2);
       await taskLite.process(vi.fn(), { keepAfterProcess: true });
 
-      await taskLite.removeByStatus({ statuses: ['completed'] });
+      await taskLite.remove({ and: { statuses: ['completed'] } });
 
       const db = taskLite.getDb();
       const results = await db.selectFrom('tasks').selectAll().execute();
