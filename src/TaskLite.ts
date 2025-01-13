@@ -58,7 +58,7 @@ export class TaskLite {
         ? ['pending', 'processing', 'completed', 'failed']
         : statuses;
     const tasks = await this.getNextQueueTasks({ statuses: statuses2, limit });
-    if (!tasks) return false;
+    if (!tasks.length) return false;
     const ids = tasks.map((t) => t.id);
     await this.setAsProcessing(ids);
     try {
