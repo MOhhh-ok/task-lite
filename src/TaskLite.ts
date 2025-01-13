@@ -104,7 +104,6 @@ export class TaskLite {
       status: 'pending',
       queued_at: new Date().toISOString(),
     };
-    console.log({ newData, updateData });
     if (ops?.upsert) {
       const query = this.db
         .insertInto('tasks')
